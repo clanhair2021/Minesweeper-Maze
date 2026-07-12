@@ -138,6 +138,12 @@
         let startTime;
         let timerId;
 
+        // 🛠️ 読み込み順のエラーを防ぐため、スコア表示関数を上に移動しました
+        function updateBestScoreDisplay() {
+            const best = localStorage.getItem(`best_time_${currentMode}`);
+            document.getElementById('best-score').innerText = best ? `🏆 自己ベスト: ${best}秒` : "🏆 自己ベスト: まだ記録がありません";
+        }
+
         function changeMode(modeKey) {
             currentMode = modeKey;
             document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
@@ -145,15 +151,12 @@
             restartGame();
         }
 
-        function updateBestScoreDisplay() {
-            const best = localStorage.getItem(`best_time_${currentMode}`);
-            document.getElementById('best-score').innerText = best ? `🏆 自己ベスト: ${best}秒` : "🏆 自己ベスト: まだ記録がありません";
-        }
-
         function restartGame() {
             clearInterval(timerId);
             gameOver = false;
             isFirstClick = true;
+            revealQueue = []; // キューもリセット
+            isProcessingQueue = false;
             
             width = modes[currentMode].width;
             height = modes[currentMode].height;
@@ -269,23 +272,21 @@
                     cellBtn.innerText = "";
                     cellBtn.id = `cell-${x}-${y}`;
                     
-                    // タップ（クリック）イベント
                     cellBtn.onclick = () => handleCellClick(x, y);
                     
-                    // 🚩フラグ機能（長押しサポート）
                     let touchTimeout;
                     cellBtn.addEventListener('touchstart', (e) => {
                         if (gameOver) return;
                         touchTimeout = setTimeout(() => {
                             toggleFlag(x, y);
                             touchTimeout = null;
-                        }, 500); // 0.5秒長押しで旗
+                        }, 500);
                     });
                     cellBtn.addEventListener('touchend', () => {
                         if (touchTimeout) clearTimeout(touchTimeout);
                     });
                     cellBtn.addEventListener('contextmenu', (e) => {
-                        e.preventDefault(); // PCでの右クリックメニュー無効化
+                        e.preventDefault();
                         toggleFlag(x, y);
                     });
 
@@ -306,7 +307,6 @@
                 element.innerText = "";
             }
 
-            // 残り爆弾数の表示を更新
             const currentFlags = flagged.flat().filter(v => v).length;
             document.getElementById('mine-counter').innerText = Math.max(0, mineCount - currentFlags);
         }
@@ -317,7 +317,6 @@
             if (isFirstClick) {
                 isFirstClick = false;
                 generateRandomMap(x, y);
-                // タイマースタート
                 startTime = Date.now();
                 timerId = setInterval(() => {
                     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -334,7 +333,6 @@
             countAdjacentMines();
         }
 
-        // ✨連鎖を「パパパパッ」と時間差にするためのキュー（処理待ちリスト）
         let revealQueue = [];
         let isProcessingQueue = false;
 
@@ -347,7 +345,6 @@
             }
         }
 
-        // 🎨 時間差で波のようにマスを開けるエフェクト処理
         function processQueue() {
             if (revealQueue.length === 0 || gameOver) {
                 isProcessingQueue = false;
@@ -364,6 +361,10 @@
 
             revealed[x][y] = true;
             const element = document.getElementById(`cell-${x}-${y}`);
+            if (!element) {
+                processQueue();
+                return;
+            }
             element.classList.add('open');
             
             const data = grid[x][y];
@@ -378,7 +379,6 @@
                 document.getElementById('result-text').innerText = `🎉 クリア！ タイム: ${finalTime}秒`;
                 document.getElementById('result-text').className = "game-clear";
                 
-                // 自己ベストの保存
                 const best = localStorage.getItem(`best_time_${currentMode}`);
                 if (!best || parseFloat(finalTime) < parseFloat(best)) {
                     localStorage.setItem(`best_time_${currentMode}`, finalTime);
@@ -400,7 +400,6 @@
                 return;
             }
             
-            // 数字のセットと本家風の色分けクラスの付与
             if (data.count > 0) {
                 element.innerText = data.count;
                 element.classList.add(`c-${data.count}`);
@@ -421,17 +420,17 @@
                 }
             }
 
-            // ⚡ 25ミリ秒（0.025秒）のディレイをかけて次のマスへ。これで波のようなアニメーションに！
             setTimeout(processQueue, 25);
         }
 
         function revealAll() {
-            revealQueue = []; // キューをクリア
+            revealQueue = [];
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     if (!revealed[x][y]) {
                         const data = grid[x][y];
                         const cell = document.getElementById(`cell-${x}-${y}`);
+                        if (!cell) continue;
                         cell.classList.add('open');
                         if (data.type === "S" || data.type === "P" || data.type === 0) {
                             cell.innerText = data.count > 0 ? data.count : "";
@@ -440,7 +439,7 @@
                         else if (data.type === "G") { cell.innerText = "G"; cell.classList.add('goal'); }
                         else if (data === 9) { 
                             if(flagged[x][y]) {
-                                cell.innerText = "🚩💣"; // 旗が当たってた場合
+                                cell.innerText = "🚩💣";
                             } else {
                                 cell.innerText = "💣"; 
                             }
@@ -451,8 +450,8 @@
             }
         }
 
+        // 初回起動
         restartGame();
     </script>
 </body>
 </html>
-
