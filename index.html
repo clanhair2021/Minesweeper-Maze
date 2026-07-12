@@ -2,22 +2,36 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>マインスイーパー×迷路</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=none">
+    <title>極・マインスイーパー×迷路</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #eef2f3; padding: 10px; margin: 0; user-select: none; }
-        h1 { font-size: 1.4rem; color: #333; margin-bottom: 5px; }
-        .info { font-size: 0.9rem; color: #666; margin-bottom: 15px; }
+        body { font-family: sans-serif; text-align: center; background: #eef2f3; padding: 10px; margin: 0; user-select: none; -webkit-user-select: none; }
+        h1 { font-size: 1.4rem; color: #333; margin: 5px 0; }
         
+        /* 難易度選択スタイル */
+        .mode-select { margin-bottom: 10px; }
+        .mode-btn {
+            padding: 6px 12px; font-size: 0.85rem; border: 2px solid #cbd5e1;
+            background: white; border-radius: 20px; cursor: pointer; margin: 0 3px; font-weight: bold; color: #64748b;
+        }
+        .mode-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
+
+        /* カウンター・タイマースタイル */
+        .stats-container {
+            display: flex; justify-content: center; gap: 15px; font-size: 0.95rem;
+            font-weight: bold; color: #475569; background: white; max-width: 320px;
+            margin: 0 auto 10px auto; padding: 8px; border-radius: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .best-score { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
+
         #game-board {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
             gap: 6px;
-            max-width: 320px;
-            margin: 0 auto 20px auto;
+            margin: 0 auto 15px auto;
             background: #bbb;
             padding: 6px;
             border-radius: 8px;
+            touch-action: manipulation;
         }
         
         .cell {
@@ -27,37 +41,77 @@
             border-radius: 4px;
             font-size: 1.2rem;
             font-weight: bold;
-            color: #334155;
             box-shadow: inset 0 -3px 0 #94a3b8;
             display: flex;
             align-items: center;
             justify-content: center;
+            cursor: pointer;
+            transition: background 0.1s, transform 0.05s;
         }
-        .cell:active { background: #94a3b8; }
+        .cell:active { transform: scale(0.95); }
         
+        /* 連鎖が広がるときの滑らかなアニメーション */
         .cell.open {
             background: #f1f5f9;
             box-shadow: none;
-            color: #1e293b;
+            animation: popOpen 0.15s ease-out forwards;
         }
-        .cell.mine { background: #ef4444; color: white; }
-        .cell.goal { background: #10b981; color: white; }
+        @keyframes popOpen {
+            0% { transform: scale(0.8); background: #cbd5e1; }
+            100% { transform: scale(1); background: #f1f5f9; }
+        }
 
-        #result-text { font-size: 1.3rem; font-weight: bold; margin: 15px 0; min-height: 30px; }
+        .cell.mine { background: #ef4444; color: white; animation: shake 0.2s; }
+        .cell.goal { background: #10b981; color: white; animation: celebrate 0.5s infinite alternate; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        @keyframes celebrate {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.05); }
+        }
+
+        /* 本家風の数字色分け */
+        .c-1 { color: #2563eb; }
+        .c-2 { color: #16a34a; }
+        .c-3 { color: #dc2626; }
+        .c-4 { color: #7c3aed; }
+        .c-5 { color: #9a3412; }
+        .c-6 { color: #0891b2; }
+        .c-7 { color: #1e293b; }
+        .c-8 { color: #64748b; }
+
+        #result-text { font-size: 1.2rem; font-weight: bold; margin: 10px 0; min-height: 28px; }
         .game-over { color: #ef4444; }
         .game-clear { color: #10b981; }
 
         button.reset-btn {
-            padding: 12px 24px; font-size: 1rem; background: #4f46e5;
+            padding: 10px 20px; font-size: 0.95rem; background: #4f46e5;
             color: white; border: none; border-radius: 6px; cursor: pointer;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-    <h1>マインスイーパー × 迷路</h1>
-    <div class="info">どこかをタップして開始！隠れたG(ゴール)を見つけ出せ！</div>
+    <h1>極・マインスイーパー × 迷路</h1>
+    
+    <!-- 難易度選択 -->
+    <div class="mode-select">
+        <button id="btn-easy" class="mode-btn active" onclick="changeMode('easy')">初級 (5x5)</button>
+        <button id="btn-medium" class="mode-btn" onclick="changeMode('medium')">中級 (7x7)</button>
+        <button id="btn-hard" class="mode-btn" onclick="changeMode('hard')">上級 (9x9)</button>
+    </div>
+
+    <!-- タイム＆残り地雷数 -->
+    <div class="stats-container">
+        <div>🚩 爆弾の数: <span id="mine-counter">0</span></div>
+        <div>⏱️ タイム: <span id="timer">0.0</span>秒</div>
+    </div>
+    <div id="best-score" class="best-score">自己ベスト: --</div>
     
     <div id="game-board"></div>
     
@@ -65,20 +119,52 @@
     <button class="reset-btn" onclick="restartGame()">新しくやり直す</button>
 
     <script>
-        const width = 5;
-        const height = 5;
-        const mineCount = 4;
+        // 難易度設定
+        const modes = {
+            easy: { width: 5, height: 5, mines: 4, maxW: "320px" },
+            medium: { width: 7, height: 7, mines: 9, maxW: "400px" },
+            hard: { width: 9, height: 9, mines: 15, maxW: "480px" }
+        };
+
+        let currentMode = 'easy';
+        let width, height, mineCount;
         let grid = [];
         let revealed = [];
+        let flagged = [];
         let gameOver = false;
         let isFirstClick = true;
 
+        // タイマー用
+        let startTime;
+        let timerId;
+
+        function changeMode(modeKey) {
+            currentMode = modeKey;
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${modeKey}`).classList.add('active');
+            restartGame();
+        }
+
+        function updateBestScoreDisplay() {
+            const best = localStorage.getItem(`best_time_${currentMode}`);
+            document.getElementById('best-score').innerText = best ? `🏆 自己ベスト: ${best}秒` : "🏆 自己ベスト: まだ記録がありません";
+        }
+
         function restartGame() {
+            clearInterval(timerId);
             gameOver = false;
             isFirstClick = true;
-            document.getElementById('result-text').className = "";
-            document.getElementById('result-text').innerText = "最初のマスをタップしてください";
             
+            width = modes[currentMode].width;
+            height = modes[currentMode].height;
+            mineCount = modes[currentMode].mines;
+
+            document.getElementById('mine-counter').innerText = mineCount;
+            document.getElementById('timer').innerText = "0.0";
+            document.getElementById('result-text').className = "";
+            document.getElementById('result-text').innerText = "長押しで🚩を設置！最初のマスをタップ！";
+            
+            updateBestScoreDisplay();
             initGrid();
             createBoardUI();
         }
@@ -86,31 +172,32 @@
         function initGrid() {
             grid = [];
             revealed = [];
+            flagged = [];
             for (let x = 0; x < width; x++) {
                 grid.push(new Array(height).fill(0));
                 revealed.push(new Array(height).fill(false));
+                flagged.push(new Array(height).fill(false));
             }
         }
 
         function generatePathFromStart(firstX, firstY) {
-            let sx = firstX;
-            let sy = firstY;
-            
+            let sx = firstX, sy = firstY;
             let gx, gy;
+            const minDistance = currentMode === 'easy' ? 3 : (currentMode === 'medium' ? 5 : 6);
+            
             do {
                 gx = Math.floor(Math.random() * width);
                 gy = Math.floor(Math.random() * height);
             } while (
                 sx === gx && sy === gy || 
-                Math.abs(sx - gx) + Math.abs(sy - gy) < 3
+                Math.abs(sx - gx) + Math.abs(sy - gy) < minDistance
             );
 
-            let cx = sx;
-            let cy = sy;
+            let cx = sx, cy = sy;
             grid[cx][cy] = "S";
 
             let safetyCounter = 0;
-            while ((cx !== gx || cy !== gy) && safetyCounter < 100) {
+            while ((cx !== gx || cy !== gy) && safetyCounter < 200) {
                 safetyCounter++;
                 let candidates = [];
                 const dirs = [{x:1, y:0}, {x:-1, y:0}, {x:0, y:1}, {x:0, y:-1}];
@@ -128,19 +215,11 @@
                     return distA - distB;
                 });
 
-                let nextCell;
-                if (Math.random() < 0.6) {
-                    nextCell = candidates[0];
-                } else {
-                    nextCell = candidates[Math.floor(Math.random() * candidates.length)];
-                }
-
+                let nextCell = Math.random() < 0.6 ? candidates[0] : candidates[Math.floor(Math.random() * candidates.length)];
                 cx = nextCell.x;
                 cy = nextCell.y;
 
-                if (grid[cx][cy] === 0) {
-                    grid[cx][cy] = "P";
-                }
+                if (grid[cx][cy] === 0) grid[cx][cy] = "P";
             }
             grid[gx][gy] = "G";
         }
@@ -171,8 +250,7 @@
                         }
                     }
                     if (grid[x][y] === 0 || grid[x][y] === "P" || grid[x][y] === "S" || grid[x][y] === "G") {
-                        const type = grid[x][y];
-                        grid[x][y] = { type: type, count: count };
+                        grid[x][y] = { type: grid[x][y], count: count };
                     }
                 }
             }
@@ -181,26 +259,70 @@
         function createBoardUI() {
             const board = document.getElementById('game-board');
             board.innerHTML = "";
+            board.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
+            board.style.maxWidth = modes[currentMode].maxW;
             
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const cellBtn = document.createElement('div');
                     cellBtn.className = 'cell';
-                    cellBtn.innerText = "❓";
-                    // 🛠️ あとでプログラム側から特定のマスを見つけやすくするためIDを付与
-                    cellBtn.id = `cell-${x}-${y}`; 
+                    cellBtn.innerText = "";
+                    cellBtn.id = `cell-${x}-${y}`;
+                    
+                    // タップ（クリック）イベント
                     cellBtn.onclick = () => handleCellClick(x, y);
+                    
+                    // 🚩フラグ機能（長押しサポート）
+                    let touchTimeout;
+                    cellBtn.addEventListener('touchstart', (e) => {
+                        if (gameOver) return;
+                        touchTimeout = setTimeout(() => {
+                            toggleFlag(x, y);
+                            touchTimeout = null;
+                        }, 500); // 0.5秒長押しで旗
+                    });
+                    cellBtn.addEventListener('touchend', () => {
+                        if (touchTimeout) clearTimeout(touchTimeout);
+                    });
+                    cellBtn.addEventListener('contextmenu', (e) => {
+                        e.preventDefault(); // PCでの右クリックメニュー無効化
+                        toggleFlag(x, y);
+                    });
+
                     board.appendChild(cellBtn);
                 }
             }
         }
 
-        function handleCellClick(x, y) {
+        function toggleFlag(x, y) {
             if (gameOver || revealed[x][y]) return;
+            
+            const element = document.getElementById(`cell-${x}-${y}`);
+            flagged[x][y] = !flagged[x][y];
+            
+            if (flagged[x][y]) {
+                element.innerText = "🚩";
+            } else {
+                element.innerText = "";
+            }
+
+            // 残り爆弾数の表示を更新
+            const currentFlags = flagged.flat().filter(v => v).length;
+            document.getElementById('mine-counter').innerText = Math.max(0, mineCount - currentFlags);
+        }
+
+        function handleCellClick(x, y) {
+            if (gameOver || revealed[x][y] || flagged[x][y]) return;
 
             if (isFirstClick) {
                 isFirstClick = false;
                 generateRandomMap(x, y);
+                // タイマースタート
+                startTime = Date.now();
+                timerId = setInterval(() => {
+                    const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                    document.getElementById('timer').innerText = elapsed;
+                }, 100);
             }
 
             revealCell(x, y);
@@ -212,29 +334,63 @@
             countAdjacentMines();
         }
 
-        // 🛠️ 【超重要】マスを開ける処理を関数として独立させ、連鎖できるように改造
+        // ✨連鎖を「パパパパッ」と時間差にするためのキュー（処理待ちリスト）
+        let revealQueue = [];
+        let isProcessingQueue = false;
+
         function revealCell(x, y) {
-            // 範囲外、またはすでに開いているなら何もしない
-            if (x < 0 || x >= width || y < 0 || y >= height || revealed[x][y]) return;
+            if (x < 0 || x >= width || y < 0 || y >= height || revealed[x][y] || flagged[x][y]) return;
             
+            revealQueue.push({x, y});
+            if (!isProcessingQueue) {
+                processQueue();
+            }
+        }
+
+        // 🎨 時間差で波のようにマスを開けるエフェクト処理
+        function processQueue() {
+            if (revealQueue.length === 0 || gameOver) {
+                isProcessingQueue = false;
+                return;
+            }
+
+            isProcessingQueue = true;
+            const {x, y} = revealQueue.shift();
+
+            if (revealed[x][y]) {
+                processQueue();
+                return;
+            }
+
             revealed[x][y] = true;
             const element = document.getElementById(`cell-${x}-${y}`);
             element.classList.add('open');
             
             const data = grid[x][y];
             
-            // ゴール地点だった場合
             if (data.type === "G") {
+                clearInterval(timerId);
                 element.innerText = "G";
                 element.className = 'cell open goal';
-                document.getElementById('result-text').innerText = "🎉 迷路クリア！おめでとう！";
+                const finalTime = ((Date.now() - startTime) / 1000).toFixed(1);
+                document.getElementById('timer').innerText = finalTime;
+                
+                document.getElementById('result-text').innerText = `🎉 クリア！ タイム: ${finalTime}秒`;
                 document.getElementById('result-text').className = "game-clear";
+                
+                // 自己ベストの保存
+                const best = localStorage.getItem(`best_time_${currentMode}`);
+                if (!best || parseFloat(finalTime) < parseFloat(best)) {
+                    localStorage.setItem(`best_time_${currentMode}`, finalTime);
+                    document.getElementById('result-text').innerText += " 🏆新記録！";
+                }
+
                 gameOver = true;
                 revealAll();
                 return;
             }
-            // 地雷だった場合
             else if (data === 9) {
+                clearInterval(timerId);
                 element.innerText = "💥";
                 element.className = 'cell open mine';
                 document.getElementById('result-text').innerText = "💀 地雷爆発！ゲームオーバー";
@@ -244,42 +400,52 @@
                 return;
             }
             
-            // スタートや普通の安全マスの表示
-            element.innerText = data.count > 0 ? data.count : "";
-            if (data.type === "P") {
-                element.style.color = "#4f46e5";
+            // 数字のセットと本家風の色分けクラスの付与
+            if (data.count > 0) {
+                element.innerText = data.count;
+                element.classList.add(`c-${data.count}`);
+            } else {
+                element.innerText = "";
             }
             
-            document.getElementById('result-text').innerText = "探索中... ゴール(G)を探せ！";
-
-            // ✨【連鎖機能】もし開けたマスの「周りの地雷の数」が0だったら、周囲8マスを自動で開ける
             if (data.count === 0) {
                 for (let dx of [-1, 0, 1]) {
                     for (let dy of [-1, 0, 1]) {
-                        // ゴール(G)を勝手に開けてクリアにならないように、G以外のマスを連鎖対象にする
-                        const nx = x + dx;
-                        const ny = y + dy;
+                        const nx = x + dx, ny = y + dy;
                         if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                             if (grid[nx][ny].type !== "G") {
-                                revealCell(nx, ny); // 👈 自分自身をもう一度呼び出す（連鎖！）
+                                revealCell(nx, ny);
                             }
                         }
                     }
                 }
             }
+
+            // ⚡ 25ミリ秒（0.025秒）のディレイをかけて次のマスへ。これで波のようなアニメーションに！
+            setTimeout(processQueue, 25);
         }
 
         function revealAll() {
+            revealQueue = []; // キューをクリア
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     if (!revealed[x][y]) {
                         const data = grid[x][y];
                         const cell = document.getElementById(`cell-${x}-${y}`);
                         cell.classList.add('open');
-                        if (data.type === "S") { cell.innerText = data.count > 0 ? data.count : ""; }
+                        if (data.type === "S" || data.type === "P" || data.type === 0) {
+                            cell.innerText = data.count > 0 ? data.count : "";
+                            if(data.count > 0) cell.classList.add(`c-${data.count}`);
+                        }
                         else if (data.type === "G") { cell.innerText = "G"; cell.classList.add('goal'); }
-                        else if (data === 9) { cell.innerText = "💣"; cell.classList.add('mine'); }
-                        else cell.innerText = data.count > 0 ? data.count : "";
+                        else if (data === 9) { 
+                            if(flagged[x][y]) {
+                                cell.innerText = "🚩💣"; // 旗が当たってた場合
+                            } else {
+                                cell.innerText = "💣"; 
+                            }
+                            cell.classList.add('mine'); 
+                        }
                     }
                 }
             }
@@ -289,3 +455,4 @@
     </script>
 </body>
 </html>
+
