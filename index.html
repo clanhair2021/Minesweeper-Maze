@@ -16,6 +16,15 @@
         }
         .mode-btn.active { background: #4f46e5; color: white; border-color: #4f46e5; }
 
+        /* 操作モード切替ボタンスタイル */
+        .action-select { margin-bottom: 10px; display: flex; justify-content: center; gap: 10px; }
+        .action-btn {
+            padding: 10px 20px; font-size: 1rem; border: 2px solid #cbd5e1;
+            background: white; border-radius: 8px; cursor: pointer; font-weight: bold; color: #475569;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 5px;
+        }
+        .action-btn.active { background: #f59e0b; color: white; border-color: #d97706; }
+
         /* カウンター・タイマースタイル */
         .stats-container {
             display: flex; justify-content: center; gap: 15px; font-size: 0.95rem;
@@ -24,10 +33,17 @@
         }
         .best-score { font-size: 0.8rem; color: #94a3b8; margin-bottom: 8px; }
 
+        .board-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            margin-bottom: 15px;
+            -webkit-overflow-scrolling: touch;
+        }
+
         #game-board {
             display: grid;
-            gap: 6px;
-            margin: 0 auto 15px auto;
+            gap: 4px;
+            margin: 0 auto;
             background: #bbb;
             padding: 6px;
             border-radius: 8px;
@@ -38,10 +54,10 @@
             aspect-ratio: 1;
             background: #cbd5e1;
             border: none;
-            border-radius: 4px;
-            font-size: 1.2rem;
+            border-radius: 3px;
+            font-size: 1rem;
             font-weight: bold;
-            box-shadow: inset 0 -3px 0 #94a3b8;
+            box-shadow: inset 0 -2px 0 #94a3b8;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -50,7 +66,6 @@
         }
         .cell:active { transform: scale(0.95); }
         
-        /* 連鎖が広がるときの滑らかなアニメーション */
         .cell.open {
             background: #f1f5f9;
             box-shadow: none;
@@ -66,15 +81,15 @@
 
         @keyframes shake {
             0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-4px); }
-            75% { transform: translateX(4px); }
+            25% { transform: translateX(-3px); }
+            75% { transform: translateX(3px); }
         }
         @keyframes celebrate {
             0% { transform: scale(1); }
             100% { transform: scale(1.05); }
         }
 
-        /* 本家風の数字色分け */
+        /* 本家風の色分け */
         .c-1 { color: #2563eb; }
         .c-2 { color: #16a34a; }
         .c-3 { color: #dc2626; }
@@ -101,32 +116,40 @@
     
     <!-- 難易度選択 -->
     <div class="mode-select">
-        <button id="btn-easy" class="mode-btn active" onclick="changeMode('easy')">初級 (5x5)</button>
-        <button id="btn-medium" class="mode-btn" onclick="changeMode('medium')">中級 (7x7)</button>
-        <button id="btn-hard" class="mode-btn" onclick="changeMode('hard')">上級 (9x9)</button>
+        <button id="btn-easy" class="mode-btn active" onclick="changeMode('easy')">初級 (9x9)</button>
+        <button id="btn-medium" class="mode-btn" onclick="changeMode('medium')">中級 (16x16)</button>
+        <button id="btn-hard" class="mode-btn" onclick="changeMode('hard')">上級 (20x20)</button>
+    </div>
+
+    <!-- 🛠️ モード切替ボタン（掘る / 旗） -->
+    <div class="action-select">
+        <button id="tool-dig" class="action-btn active" onclick="setClickMode('dig')">⛏️ 開ける</button>
+        <button id="tool-flag" class="action-btn" onclick="setClickMode('flag')">🚩 旗を置く</button>
     </div>
 
     <!-- タイム＆残り地雷数 -->
     <div class="stats-container">
-        <div>🚩 爆弾の数: <span id="mine-counter">0</span></div>
+        <div>🚩 爆弾: <span id="mine-counter">0</span></div>
         <div>⏱️ タイム: <span id="timer">0.0</span>秒</div>
     </div>
     <div id="best-score" class="best-score">自己ベスト: --</div>
     
-    <div id="game-board"></div>
+    <div class="board-wrapper">
+        <div id="game-board"></div>
+    </div>
     
     <div id="result-text"></div>
     <button class="reset-btn" onclick="restartGame()">新しくやり直す</button>
 
     <script>
-        // 難易度設定
         const modes = {
-            easy: { width: 5, height: 5, mines: 4, maxW: "320px" },
-            medium: { width: 7, height: 7, mines: 9, maxW: "400px" },
-            hard: { width: 9, height: 9, mines: 15, maxW: "480px" }
+            easy: { width: 9, height: 9, mines: 10, minCellW: "35px" },
+            medium: { width: 16, height: 16, mines: 40, minCellW: "28px" },
+            hard: { width: 20, height: 20, mines: 70, minCellW: "24px" }
         };
 
         let currentMode = 'easy';
+        let clickMode = 'dig'; // 'dig' か 'flag'
         let width, height, mineCount;
         let grid = [];
         let revealed = [];
@@ -134,11 +157,9 @@
         let gameOver = false;
         let isFirstClick = true;
 
-        // タイマー用
         let startTime;
         let timerId;
 
-        // 🛠️ 読み込み順のエラーを防ぐため、スコア表示関数を上に移動しました
         function updateBestScoreDisplay() {
             const best = localStorage.getItem(`best_time_${currentMode}`);
             document.getElementById('best-score').innerText = best ? `🏆 自己ベスト: ${best}秒` : "🏆 自己ベスト: まだ記録がありません";
@@ -151,12 +172,21 @@
             restartGame();
         }
 
+        // 🛠️ クリック時のツールを切り替える関数
+        function setClickMode(mode) {
+            clickMode = mode;
+            document.querySelectorAll('.action-btn').forEach(b => b.classList.remove('active'));
+            if (mode === 'dig') document.getElementById('tool-dig').classList.add('active');
+            if (mode === 'flag') document.getElementById('tool-flag').classList.add('active');
+        }
+
         function restartGame() {
             clearInterval(timerId);
             gameOver = false;
             isFirstClick = true;
-            revealQueue = []; // キューもリセット
+            revealQueue = [];
             isProcessingQueue = false;
+            setClickMode('dig'); // リセット時は「開ける」モードに戻す
             
             width = modes[currentMode].width;
             height = modes[currentMode].height;
@@ -165,7 +195,7 @@
             document.getElementById('mine-counter').innerText = mineCount;
             document.getElementById('timer').innerText = "0.0";
             document.getElementById('result-text').className = "";
-            document.getElementById('result-text').innerText = "長押しで🚩を設置！最初のマスをタップ！";
+            document.getElementById('result-text').innerText = "モードを選んでマスをタップ！";
             
             updateBestScoreDisplay();
             initGrid();
@@ -186,7 +216,7 @@
         function generatePathFromStart(firstX, firstY) {
             let sx = firstX, sy = firstY;
             let gx, gy;
-            const minDistance = currentMode === 'easy' ? 3 : (currentMode === 'medium' ? 5 : 6);
+            const minDistance = currentMode === 'easy' ? 5 : (currentMode === 'medium' ? 10 : 14);
             
             do {
                 gx = Math.floor(Math.random() * width);
@@ -200,7 +230,7 @@
             grid[cx][cy] = "S";
 
             let safetyCounter = 0;
-            while ((cx !== gx || cy !== gy) && safetyCounter < 200) {
+            while ((cx !== gx || cy !== gy) && safetyCounter < 500) {
                 safetyCounter++;
                 let candidates = [];
                 const dirs = [{x:1, y:0}, {x:-1, y:0}, {x:0, y:1}, {x:0, y:-1}];
@@ -263,7 +293,9 @@
             const board = document.getElementById('game-board');
             board.innerHTML = "";
             board.style.gridTemplateColumns = `repeat(${width}, 1fr)`;
-            board.style.maxWidth = modes[currentMode].maxW;
+            
+            const minCellWidth = modes[currentMode].minCellW;
+            board.style.width = `calc(${width} * ${minCellWidth})`;
             
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
@@ -272,19 +304,12 @@
                     cellBtn.innerText = "";
                     cellBtn.id = `cell-${x}-${y}`;
                     
+                    if(currentMode === 'hard') cellBtn.style.fontSize = "0.75rem";
+                    else if(currentMode === 'medium') cellBtn.style.fontSize = "0.85rem";
+                    
                     cellBtn.onclick = () => handleCellClick(x, y);
                     
-                    let touchTimeout;
-                    cellBtn.addEventListener('touchstart', (e) => {
-                        if (gameOver) return;
-                        touchTimeout = setTimeout(() => {
-                            toggleFlag(x, y);
-                            touchTimeout = null;
-                        }, 500);
-                    });
-                    cellBtn.addEventListener('touchend', () => {
-                        if (touchTimeout) clearTimeout(touchTimeout);
-                    });
+                    // PCの右クリック時はいつでも旗を置ける便利機能は残します
                     cellBtn.addEventListener('contextmenu', (e) => {
                         e.preventDefault();
                         toggleFlag(x, y);
@@ -312,7 +337,25 @@
         }
 
         function handleCellClick(x, y) {
-            if (gameOver || revealed[x][y] || flagged[x][y]) return;
+            if (gameOver) return;
+
+            // 1. すでに開いている数字のマスをクリックした場合（周囲まとめてオープン機能）
+            if (revealed[x][y]) {
+                const data = grid[x][y];
+                if (data && data.count > 0) {
+                    checkAndClearAround(x, y, data.count);
+                }
+                return;
+            }
+
+            // 2. 旗モードの場合
+            if (clickMode === 'flag') {
+                toggleFlag(x, y);
+                return;
+            }
+
+            // 3. 開けるモードの場合（通常のオープン）
+            if (flagged[x][y]) return; // 旗があればガード
 
             if (isFirstClick) {
                 isFirstClick = false;
@@ -327,10 +370,34 @@
             revealCell(x, y);
         }
 
-        function generateRandomMap(startX, startY) {
-            generatePathFromStart(startX, startY);
-            placeMines();
-            countAdjacentMines();
+        // 🛠️ 【超重要】周囲の旗の数を数えて、数が一致していれば残りを一気に開く本家機能
+        function checkAndClearAround(x, y, requiredMines) {
+            let flagCount = 0;
+            
+            // 周囲8マスの旗の数をカウント
+            for (let dx of [-1, 0, 1]) {
+                for (let dy of [-1, 0, 1]) {
+                    const nx = x + dx, ny = y + dy;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        if (flagged[nx][ny]) flagCount++;
+                    }
+                }
+            }
+
+            // 数字と同じ数だけ旗が立っていれば、旗以外の残りのマスを一気に開く！
+            if (flagCount === requiredMines) {
+                for (let dx of [-1, 0, 1]) {
+                    for (let dy of [-1, 0, 1]) {
+                        const nx = x + dx, ny = y + dy;
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            if (!revealed[nx][ny] && !flagged[nx][ny]) {
+                                // もしゴール(G)を連鎖に含めたい場合は即座に開ける
+                                revealCell(nx, ny);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         let revealQueue = [];
@@ -420,7 +487,7 @@
                 }
             }
 
-            setTimeout(processQueue, 25);
+            setTimeout(processQueue, 15);
         }
 
         function revealAll() {
@@ -439,7 +506,7 @@
                         else if (data.type === "G") { cell.innerText = "G"; cell.classList.add('goal'); }
                         else if (data === 9) { 
                             if(flagged[x][y]) {
-                                cell.innerText = "🚩💣";
+                                cell.innerText = "🚩";
                             } else {
                                 cell.innerText = "💣"; 
                             }
@@ -450,8 +517,8 @@
             }
         }
 
-        // 初回起動
         restartGame();
     </script>
 </body>
 </html>
+
