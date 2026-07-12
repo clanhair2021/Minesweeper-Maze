@@ -41,7 +41,6 @@
             color: #1e293b;
         }
         .cell.mine { background: #ef4444; color: white; }
-        .cell.start { background: #3b82f6; color: white; }
         .cell.goal { background: #10b981; color: white; }
 
         #result-text { font-size: 1.3rem; font-weight: bold; margin: 15px 0; min-height: 30px; }
@@ -58,7 +57,7 @@
 <body>
 
     <h1>マインスイーパー × 迷路</h1>
-    <div class="info">好きな場所をタップしてスタート！隠れたG(ゴール)を目指せ！</div>
+    <div class="info">どこかをタップして開始！隠れたG(ゴール)を見つけ出せ！</div>
     
     <div id="game-board"></div>
     
@@ -72,16 +71,16 @@
         let grid = [];
         let revealed = [];
         let gameOver = false;
-        let isFirstClick = true; // 👈 最初のクリックかどうかを判定するフラグ
+        let isFirstClick = true;
 
         function restartGame() {
             gameOver = false;
-            isFirstClick = true; // リセット
+            isFirstClick = true;
             document.getElementById('result-text').className = "";
             document.getElementById('result-text').innerText = "最初のマスをタップしてください";
             
             initGrid();
-            createBoardUI(); // 👈 最初はマップを作らず、ボタンの見た目だけ用意する
+            createBoardUI();
         }
 
         function initGrid() {
@@ -93,12 +92,10 @@
             }
         }
 
-        // 🛠️ 【改造】プレイヤーがタップした場所（firstX, firstY）を起点に迷路を作る
         function generatePathFromStart(firstX, firstY) {
             let sx = firstX;
             let sy = firstY;
             
-            // ゴール地点をランダムに決定（スタートからある程度離す）
             let gx, gy;
             do {
                 gx = Math.floor(Math.random() * width);
@@ -196,25 +193,21 @@
             }
         }
 
-        // 🛠️ タップ時の処理（ファーストクリックの判定を追加）
         function handleCellClick(x, y, element) {
             if (gameOver || revealed[x][y]) return;
 
-            // ✨ もしこれがゲーム開始後、最初のタップだったら
             if (isFirstClick) {
                 isFirstClick = false;
-                generateRandomMap(x, y); // タップされた位置を元にマップを生成！
-                // マップが生成されたので、DOM要素に紐づくデータ状態などを考慮して再取得、またはそのまま処理
+                generateRandomMap(x, y);
             }
 
             revealCell(x, y, element);
         }
 
-        // 🛠️ 最初のタップの瞬間に裏側でマップを組み立てる
         function generateRandomMap(startX, startY) {
-            generatePathFromStart(startX, startY); // スタート位置を固定して道を作る
-            placeMines();                         // 地雷を置く
-            countAdjacentMines();                 // 周囲の地雷を数える
+            generatePathFromStart(startX, startY);
+            placeMines();
+            countAdjacentMines();
         }
 
         function revealCell(x, y, element) {
@@ -223,9 +216,9 @@
             
             const data = grid[x][y];
             
+            // 🛠️ 【改造】Sだった場合も、普通の安全なマスとして数字か空白を表示する
             if (data.type === "S") {
-                element.innerText = "S";
-                element.className = 'cell open start';
+                element.innerText = data.count > 0 ? data.count : "";
                 document.getElementById('result-text').innerText = "探索中... ゴール(G)を探せ！";
             }
             else if (data.type === "G") {
@@ -261,7 +254,8 @@
                     const cell = cells[idx];
                     if (!revealed[x][y]) {
                         cell.classList.add('open');
-                        if (data.type === "S") { cell.innerText = "S"; cell.classList.add('start'); }
+                        // 答え合わせ時もSは数字として表示
+                        if (data.type === "S") { cell.innerText = data.count > 0 ? data.count : ""; }
                         else if (data.type === "G") { cell.innerText = "G"; cell.classList.add('goal'); }
                         else if (data === 9) { cell.innerText = "💣"; cell.classList.add('mine'); }
                         else cell.innerText = data.count > 0 ? data.count : "";
