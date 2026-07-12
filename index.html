@@ -3,93 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>マインスイーパー×迷路 開発室</title>
+    <title>マインスイーパー×迷路</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f0f0f0; padding: 20px; margin: 0; }
-        h1 { font-size: 1.2rem; color: #333; }
-        #log-window {
-            background: #222; color: #0f0; font-family: monospace;
-            padding: 15px; border-radius: 5px; max-width: 400px;
-            margin: 20px auto; text-align: left; white-space: pre;
-            overflow-x: auto; font-size: 1.1rem; line-height: 1.4;
+        body { font-family: sans-serif; text-align: center; background: #eef2f3; padding: 10px; margin: 0; user-select: none; }
+        h1 { font-size: 1.4rem; color: #333; margin-bottom: 5px; }
+        .info { font-size: 0.9rem; color: #666; margin-bottom: 15px; }
+        
+        /* 5x5のマス目をきれいに並べるグリッド設定 */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            max-width: 320px;
+            margin: 0 auto 20px auto;
+            background: #bbb;
+            padding: 6px;
+            border-radius: 8px;
         }
-        button {
-            padding: 10px 20px; font-size: 1rem; background: #007bff;
-            color: white; border: none; border-radius: 5px; cursor: pointer;
+        
+        /* マスのボタンのデザイン */
+        .cell {
+            aspect-ratio: 1; /* 正方形にする */
+            background: #cbd5e1;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #334155;
+            box-shadow: inset 0 -3px 0 #94a3b8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        button:active { background: #0056b3; }
-        .info { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
+        .cell:active { background: #94a3b8; }
+        
+        /* 開いたマスのデザイン */
+        .cell.open {
+            background: #f1f5f9;
+            box-shadow: none;
+            color: #1e293b;
+        }
+        .cell.mine { background: #ef4444; color: white; }
+        .cell.start { background: #3b82f6; color: white; }
+        .cell.goal { background: #10b981; color: white; }
+
+        #result-text { font-size: 1.3rem; font-weight: bold; margin: 15px 0; min-height: 30px; }
+        .game-over { color: #ef4444; }
+        .game-clear { color: #10b981; }
+
+        button.reset-btn {
+            padding: 12px 24px; font-size: 1rem; background: #4f46e5;
+            color: white; border: none; border-radius: 6px; cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
     </style>
 </head>
 <body>
 
-    <h1>マインスイーパー×迷路 (迷路ルート生成テスト)</h1>
-    <div class="info">※「S」がスタート、「G」がゴール、「P」が安全な道、「9」が地雷です</div>
-    <button onclick="restartGame()">迷路と地雷を再生成</button>
+    <h1>マインスイーパー × 迷路</h1>
+    <div class="info">S(スタート)からG(ゴール)へ、地雷を避けて進め！</div>
     
-    <div id="log-window"></div>
+    <!-- ここにボタンが5x5で並びます -->
+    <div id="game-board"></div>
+    
+    <div id="result-text"></div>
+    <button class="reset-btn" onclick="restartGame()">新しくやり直す</button>
 
     <script>
         const width = 5;
         const height = 5;
-        const mineCount = 4; // 道を確保するため地雷を4個に少し減らします
-        let grid = [];
+        const mineCount = 4;
+        let grid = [];      // 中身のデータ（S, P, G, 9, 数字）
+        let revealed = [];  // マスが開いているかどうか（true / false）
+        let gameOver = false;
 
         function restartGame() {
-            document.getElementById('log-window').innerHTML = "生成中...\n";
+            gameOver = false;
+            document.getElementById('result-text').className = "";
+            document.getElementById('result-text').innerText = "スタートをタップして開始！";
+            
             initGrid();
-            generatePath(); // 👈 先に安全な「一本道」を作る
-            placeMines();   // 👈 道を避けて地雷を置く
+            generatePath();
+            placeMines();
             countAdjacentMines();
-            printGridTest();
+            createBoardUI();
         }
 
         function initGrid() {
             grid = [];
+            revealed = [];
             for (let x = 0; x < width; x++) {
-                let column = [];
-                for (let y = 0; y < height; y++) {
-                    column.push(0);
-                }
-                grid.push(column);
+                grid.push(new Array(height).fill(0));
+                revealed.push(new Array(height).fill(false));
             }
         }
 
-        // 🛠️ 【新機能】スタートからゴールまでのランダムな一本道を作る
-        // (簡易的なランダムウォークアルゴリズム)
         function generatePath() {
-            let cx = 0; // スタートは左上 (0,0)
-            let cy = 0;
-            grid[cx][cy] = "S"; // S = Start
-
-            // ゴール (右下) にたどり着くまで右か下に進む
+            let cx = 0, cy = 0;
+            grid[cx][cy] = "S";
             while (cx < width - 1 || cy < height - 1) {
-                // 右に進むか、下に進むかをランダムで決める
                 if (cx < width - 1 && cy < height - 1) {
                     if (Math.random() < 0.5) cx++; else cy++;
-                } else if (cx < width - 1) {
-                    cx++; // 右端にいくまで右
-                } else {
-                    cy++; // 下端にいくまで下
-                }
-
-                // ゴール地点なら「G」、途中なら「P（Path=道）」とする
-                if (cx === width - 1 && cy === height - 1) {
-                    grid[cx][cy] = "G"; // G = Goal
-                } else {
-                    grid[cx][cy] = "P"; // P = 安全な道
-                }
+                } else if (cx < width - 1) { cx++; } else { cy++; }
+                grid[cx][cy] = (cx === width - 1 && cy === height - 1) ? "G" : "P";
             }
         }
 
-        // 🛠️ 【改造】すでに「道(S, G, P)」がある場所を避けて地雷を置く
         function placeMines() {
             let placed = 0;
             while (placed < mineCount) {
                 const rx = Math.floor(Math.random() * width);
                 const ry = Math.floor(Math.random() * height);
-                
-                // 0（まだ何も置かれていない空きマス）の場所にだけ地雷を置く
                 if (grid[rx][ry] === 0) {
                     grid[rx][ry] = 9;
                     placed++;
@@ -100,44 +124,113 @@
         function countAdjacentMines() {
             for (let x = 0; x < width; x++) {
                 for (let y = 0; y < height; y++) {
-                    // 自分自身が地雷(9)か、スタート(S)・ゴール(G)・道(P)なら数字計算をスキップ
                     if (grid[x][y] === 9) continue;
-                    
                     let count = 0;
                     for (let dx of [-1, 0, 1]) {
                         for (let dy of [-1, 0, 1]) {
-                            const nx = x + dx;
-                            const ny = y + dy;
+                            const nx = x + dx, ny = y + dy;
                             if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                                 if (grid[nx][ny] === 9) count++;
                             }
                         }
                     }
-                    
-                    // 空きマス（0）だった場所には、周りの地雷の数をそのまま入れる
-                    if (grid[x][y] === 0) {
-                        grid[x][y] = count;
+                    if (grid[x][y] === 0 || grid[x][y] === "P") {
+                        // 道(P)でも空きマスでも、ヒントとなる地雷数を記憶させる
+                        // 元々の属性（S, G, P）を忘れないようにオブジェクト形式で保存
+                        const type = grid[x][y];
+                        grid[x][y] = { type: type, count: count };
                     }
-                    // 道（P）だった場所は、分かりやすいように後で「文字と数字」を組み合わせるため、
-                    // ここでは一旦そのままにしておきます（次のステップで、ゲームとして遊べるようにします）
                 }
             }
         }
 
-        function printGridTest() {
-            let output = "--- 迷路マップ ---\n";
+        // 🛠️ 画面にマス目のボタンを組み立てる処理
+        function createBoardUI() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = ""; // 一度リセット
+            
+            // 縦横の並び順通りにボタンを作っていく
             for (let y = 0; y < height; y++) {
-                let line = "";
                 for (let x = 0; x < width; x++) {
-                    line += grid[x][y] + " ";
+                    const cellBtn = document.createElement('div');
+                    cellBtn.className = 'cell';
+                    cellBtn.innerText = "❓"; // 最初は全員はてな
+                    
+                    // スマホでタップされた時のイベント
+                    cellBtn.onclick = () => clickCell(x, y, cellBtn);
+                    
+                    board.appendChild(cellBtn);
                 }
-                output += line + "\n";
             }
-            document.getElementById('log-window').innerHTML = output;
         }
 
+        // 🛠️ マスをタップした時の処理
+        function clickCell(x, y, element) {
+            if (gameOver || revealed[x][y]) return;
+            
+            revealed[x][y] = true;
+            element.classList.add('open');
+            
+            const data = grid[x][y];
+            
+            // 1. スタート地点だった場合
+            if (data === "S") {
+                element.innerText = "S";
+                element.classList.add('start');
+                document.getElementById('result-text').innerText = "探索中...";
+            }
+            // 2. ゴール地点だった場合（クリア！）
+            else if (data === "G") {
+                element.innerText = "G";
+                element.classList.add('goal');
+                document.getElementById('result-text').innerText = "🎉 迷路クリア！おめでとう！";
+                document.getElementById('result-text').className = "game-clear";
+                gameOver = true;
+                revealAll();
+            }
+            // 3. 地雷だった場合（ゲームオーバー）
+            else if (data === 9) {
+                element.innerText = "💥";
+                element.classList.add('mine');
+                document.getElementById('result-text').innerText = "💀 地雷爆発！ゲームオーバー";
+                document.getElementById('result-text').className = "game-over";
+                gameOver = true;
+                revealAll();
+            }
+            // 4. 道(P)または普通の安全なマスの By
+            else {
+                // 周囲の地雷数を表示（0なら空白）
+                element.innerText = data.count > 0 ? data.count : "";
+                
+                // もしそれが「正しい道(P)」の上だったら、ちょっとだけ目印を付ける
+                if (data.type === "P") {
+                    element.style.color = "#4f46e5"; // 道の上の数字は青紫っぽくする
+                }
+            }
+        }
+
+        // ゲーム終了時に全部のマスをオープンにする
+        function revealAll() {
+            const cells = document.getElementsByClassName('cell');
+            let idx = 0;
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const data = grid[x][y];
+                    const cell = cells[idx];
+                    if (!revealed[x][y]) {
+                        cell.classList.add('open');
+                        if (data === "S") cell.innerText = "S";
+                        else if (data === "G") cell.innerText = "G";
+                        else if (data === 9) cell.innerText = "💣";
+                        else cell.innerText = data.count > 0 ? data.count : "";
+                    }
+                    idx++;
+                }
+            }
+        }
+
+        // 初回起動
         restartGame();
     </script>
 </body>
 </html>
-
