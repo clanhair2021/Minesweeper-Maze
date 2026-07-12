@@ -9,7 +9,6 @@
         h1 { font-size: 1.4rem; color: #333; margin-bottom: 5px; }
         .info { font-size: 0.9rem; color: #666; margin-bottom: 15px; }
         
-        /* 5x5のマス目をきれいに並べるグリッド設定 */
         #game-board {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -21,9 +20,8 @@
             border-radius: 8px;
         }
         
-        /* マスのボタンのデザイン */
         .cell {
-            aspect-ratio: 1; /* 正方形にする */
+            aspect-ratio: 1;
             background: #cbd5e1;
             border: none;
             border-radius: 4px;
@@ -37,7 +35,6 @@
         }
         .cell:active { background: #94a3b8; }
         
-        /* 開いたマスのデザイン */
         .cell.open {
             background: #f1f5f9;
             box-shadow: none;
@@ -61,9 +58,8 @@
 <body>
 
     <h1>マインスイーパー × 迷路</h1>
-    <div class="info">S(スタート)からG(ゴール)へ、地雷を避けて進め！</div>
+    <div class="info">毎回変わるS(スタート)からG(ゴール)へ、地雷を避けて進め！</div>
     
-    <!-- ここにボタンが5x5で並びます -->
     <div id="game-board"></div>
     
     <div id="result-text"></div>
@@ -72,18 +68,18 @@
     <script>
         const width = 5;
         const height = 5;
-        const mineCount = 4;
-        let grid = [];      // 中身のデータ（S, P, G, 9, 数字）
-        let revealed = [];  // マスが開いているかどうか（true / false）
+        const mineCount = 4; // 道を確保しやすくするため4個にします
+        let grid = [];
+        let revealed = [];
         let gameOver = false;
 
         function restartGame() {
             gameOver = false;
             document.getElementById('result-text').className = "";
-            document.getElementById('result-text').innerText = "スタートをタップして開始！";
+            document.getElementById('result-text').innerText = "スタート(S)を探してタップしよう！";
             
             initGrid();
-            generatePath();
+            generateRandomPath(); // 👈 強化されたクネクネ・ランダムルート生成
             placeMines();
             countAdjacentMines();
             createBoardUI();
@@ -98,15 +94,72 @@
             }
         }
 
-        function generatePath() {
-            let cx = 0, cy = 0;
+        // 🛠️ 【超強化】スタート＆ゴール完全ランダム ＋ 上下左右クネクネ道生成
+        function generateRandomPath() {
+            // 1. スタート地点を完全ランダムに決定
+            let sx = Math.floor(Math.random() * width);
+            let sy = Math.floor(Math.random() * height);
+            
+            // 2. ゴール地点をランダムに決定（スタートと同じにならないようにする）
+            let gx, gy;
+            do {
+                gx = Math.floor(Math.random() * width);
+                gy = Math.floor(Math.random() * height);
+            } while (
+                sx === gx && sy === gy || 
+                Math.abs(sx - gx) + Math.abs(sy - gy) < 3 // あまりに近すぎたらやり直し（最低でも3マス以上離す）
+            );
+
+            // 3. スタートからゴールまで上下左右に歩いて道を繋ぐ（ランダムウォーク）
+            let cx = sx;
+            let cy = sy;
+            let pathCells = [{x: cx, y: cy}];
             grid[cx][cy] = "S";
-            while (cx < width - 1 || cy < height - 1) {
-                if (cx < width - 1 && cy < height - 1) {
-                    if (Math.random() < 0.5) cx++; else cy++;
-                } else if (cx < width - 1) { cx++; } else { cy++; }
-                grid[cx][cy] = (cx === width - 1 && cy === height - 1) ? "G" : "P";
+
+            let safetyCounter = 0; // 無限ループ防止用の保険
+            while ((cx !== gx || cy !== gy) && safetyCounter < 100) {
+                safetyCounter++;
+                
+                // 次に進める候補（上下左右）をリストアップ
+                let candidates = [];
+                const dirs = [{x:1, y:0}, {x:-1, y:0}, {x:0, y:1}, {x:0, y:-1}];
+                
+                for (let d of dirs) {
+                    let nx = cx + d.x;
+                    let ny = cy + d.y;
+                    // 盤面の枠内かどうか
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        candidates.push({x: nx, y: ny});
+                    }
+                }
+
+                // ゴールに近づく方向への移動を少し優先させるためのスコア計算
+                candidates.sort((a, b) => {
+                    const distA = Math.abs(a.x - gx) + Math.abs(a.y - gy);
+                    const distB = Math.abs(b.x - gx) + Math.abs(b.y - gy);
+                    return distA - distB; // ゴールに近い方が先頭にくる
+                });
+
+                // 上位の候補からランダム、または少し遊びを持たせて進む方向を決定
+                let nextCell;
+                if (Math.random() < 0.6) {
+                    nextCell = candidates[0]; // 60%の確率でゴールに近い方へ
+                } else {
+                    nextCell = candidates[Math.floor(Math.random() * candidates.length)]; // 40%で気まぐれに動く
+                }
+
+                cx = nextCell.x;
+                cy = nextCell.y;
+
+                // まだ登録されていないマスなら道として記録
+                if (grid[cx][cy] === 0) {
+                    grid[cx][cy] = "P";
+                    pathCells.push({x: cx, y: cy});
+                }
             }
+
+            // 最後に最終地点をしっかり「G」にする
+            grid[gx][gy] = "G";
         }
 
         function placeMines() {
@@ -134,9 +187,7 @@
                             }
                         }
                     }
-                    if (grid[x][y] === 0 || grid[x][y] === "P") {
-                        // 道(P)でも空きマスでも、ヒントとなる地雷数を記憶させる
-                        // 元々の属性（S, G, P）を忘れないようにオブジェクト形式で保存
+                    if (grid[x][y] === 0 || grid[x][y] === "P" || grid[x][y] === "S" || grid[x][y] === "G") {
                         const type = grid[x][y];
                         grid[x][y] = { type: type, count: count };
                     }
@@ -144,27 +195,21 @@
             }
         }
 
-        // 🛠️ 画面にマス目のボタンを組み立てる処理
         function createBoardUI() {
             const board = document.getElementById('game-board');
-            board.innerHTML = ""; // 一度リセット
+            board.innerHTML = "";
             
-            // 縦横の並び順通りにボタンを作っていく
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
                     const cellBtn = document.createElement('div');
                     cellBtn.className = 'cell';
-                    cellBtn.innerText = "❓"; // 最初は全員はてな
-                    
-                    // スマホでタップされた時のイベント
+                    cellBtn.innerText = "❓";
                     cellBtn.onclick = () => clickCell(x, y, cellBtn);
-                    
                     board.appendChild(cellBtn);
                 }
             }
         }
 
-        // 🛠️ マスをタップした時の処理
         function clickCell(x, y, element) {
             if (gameOver || revealed[x][y]) return;
             
@@ -173,14 +218,12 @@
             
             const data = grid[x][y];
             
-            // 1. スタート地点だった場合
-            if (data === "S") {
+            if (data.type === "S") {
                 element.innerText = "S";
                 element.classList.add('start');
-                document.getElementById('result-text').innerText = "探索中...";
+                document.getElementById('result-text').innerText = "探索中... ゴール(G)を探せ！";
             }
-            // 2. ゴール地点だった場合（クリア！）
-            else if (data === "G") {
+            else if (data.type === "G") {
                 element.innerText = "G";
                 element.classList.add('goal');
                 document.getElementById('result-text').innerText = "🎉 迷路クリア！おめでとう！";
@@ -188,7 +231,6 @@
                 gameOver = true;
                 revealAll();
             }
-            // 3. 地雷だった場合（ゲームオーバー）
             else if (data === 9) {
                 element.innerText = "💥";
                 element.classList.add('mine');
@@ -197,19 +239,14 @@
                 gameOver = true;
                 revealAll();
             }
-            // 4. 道(P)または普通の安全なマスの By
             else {
-                // 周囲の地雷数を表示（0なら空白）
                 element.innerText = data.count > 0 ? data.count : "";
-                
-                // もしそれが「正しい道(P)」の上だったら、ちょっとだけ目印を付ける
                 if (data.type === "P") {
-                    element.style.color = "#4f46e5"; // 道の上の数字は青紫っぽくする
+                    element.style.color = "#4f46e5"; // 道の上の数字
                 }
             }
         }
 
-        // ゲーム終了時に全部のマスをオープンにする
         function revealAll() {
             const cells = document.getElementsByClassName('cell');
             let idx = 0;
@@ -219,8 +256,8 @@
                     const cell = cells[idx];
                     if (!revealed[x][y]) {
                         cell.classList.add('open');
-                        if (data === "S") cell.innerText = "S";
-                        else if (data === "G") cell.innerText = "G";
+                        if (data.type === "S") { cell.innerText = "S"; cell.classList.add('start'); }
+                        else if (data.type === "G") { cell.innerText = "G"; cell.classList.add('goal'); }
                         else if (data === 9) cell.innerText = "💣";
                         else cell.innerText = data.count > 0 ? data.count : "";
                     }
@@ -229,8 +266,8 @@
             }
         }
 
-        // 初回起動
         restartGame();
     </script>
 </body>
 </html>
+
