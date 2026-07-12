@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マインスイーパー×迷路 開発室</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f0f0f0; padding: 20px; margin: 0; }
+        h1 { font-size: 1.2rem; color: #333; }
+        #log-window {
+            background: #222; color: #0f0; font-family: monospace;
+            padding: 15px; border-radius: 5px; max-width: 400px;
+            margin: 20px auto; text-align: left; white-space: pre;
+            overflow-x: auto; font-size: 1.1rem; line-height: 1.4;
+        }
+        button {
+            padding: 10px 20px; font-size: 1rem; background: #007bff;
+            color: white; border: none; border-radius: 5px; cursor: pointer;
+        }
+        button:active { background: #0056b3; }
+    </style>
+</head>
+<body>
+
+    <h1>マインスイーパー×迷路 (ロジックテスト画面)</h1>
+    <button onclick="restartGame()">盤面を再生成する</button>
+    
+    <!-- ここに結果（ログ）が表示されます -->
+    <div id="log-window"></div>
+
+    <script>
+        const width = 5;
+        const height = 5;
+        const mineCount = 5;
+        let grid = [];
+
+        function restartGame() {
+            document.getElementById('log-window').innerHTML = "生成中...\n";
+            initGrid();
+            placeMines();
+            countAdjacentMines();
+            printGridTest();
+        }
+
+        // 1. 盤面を0で初期化
+        function initGrid() {
+            grid = [];
+            for (let x = 0; x < width; x++) {
+                let column = [];
+                for (let y = 0; y < height; y++) {
+                    column.append ? null : column.push(0);
+                }
+                grid.push(column);
+            }
+        }
+
+        // 2. 地雷をランダムに配置 (9を地雷とする)
+        function placeMines() {
+            let placed = 0;
+            while (placed < mineCount) {
+                const rx = Math.floor(Math.random() * width);
+                const ry = Math.floor(Math.random() * height);
+                if (grid[rx][ry] !== 9) {
+                    grid[rx][ry] = 9;
+                    placed++;
+                }
+            }
+        }
+
+        // 3. 周囲の地雷を数える
+        function countAdjacentMines() {
+            for (let x = 0; x < width; x++) {
+                for (let y = 0; y < height; y++) {
+                    if (grid[x][y] === 9) continue;
+
+                    let count = 0;
+                    for (let dx of [-1, 0, 1]) {
+                        for (let dy of [-1, 0, 1]) {
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                if (grid[nx][ny] === 9) count++;
+                            }
+                        }
+                    }
+                    grid[x][y] = count;
+                }
+            }
+        }
+
+        // 4. 黒い画面に文字で出力する
+        function printGridTest() {
+            let output = "--- マップデータ ---\n";
+            for (let y = 0; y < height; y++) {
+                let line = "";
+                for (let x = 0; x < width; x++) {
+                    line += grid[x][y] + " ";
+                }
+                output += line + "\n";
+            }
+            document.getElementById('log-window').innerHTML = output;
+        }
+
+        // 最初に一回実行しておく
+        restartGame();
+    </script>
+</body>
+</html>
