@@ -18,61 +18,91 @@
             color: white; border: none; border-radius: 5px; cursor: pointer;
         }
         button:active { background: #0056b3; }
+        .info { font-size: 0.9rem; color: #666; margin-bottom: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>マインスイーパー×迷路 (ロジックテスト画面)</h1>
-    <button onclick="restartGame()">盤面を再生成する</button>
+    <h1>マインスイーパー×迷路 (迷路ルート生成テスト)</h1>
+    <div class="info">※「S」がスタート、「G」がゴール、「P」が安全な道、「9」が地雷です</div>
+    <button onclick="restartGame()">迷路と地雷を再生成</button>
     
-    <!-- ここに結果（ログ）が表示されます -->
     <div id="log-window"></div>
 
     <script>
         const width = 5;
         const height = 5;
-        const mineCount = 5;
+        const mineCount = 4; // 道を確保するため地雷を4個に少し減らします
         let grid = [];
 
         function restartGame() {
             document.getElementById('log-window').innerHTML = "生成中...\n";
             initGrid();
-            placeMines();
+            generatePath(); // 👈 先に安全な「一本道」を作る
+            placeMines();   // 👈 道を避けて地雷を置く
             countAdjacentMines();
             printGridTest();
         }
 
-        // 1. 盤面を0で初期化
         function initGrid() {
             grid = [];
             for (let x = 0; x < width; x++) {
                 let column = [];
                 for (let y = 0; y < height; y++) {
-                    column.append ? null : column.push(0);
+                    column.push(0);
                 }
                 grid.push(column);
             }
         }
 
-        // 2. 地雷をランダムに配置 (9を地雷とする)
+        // 🛠️ 【新機能】スタートからゴールまでのランダムな一本道を作る
+        // (簡易的なランダムウォークアルゴリズム)
+        function generatePath() {
+            let cx = 0; // スタートは左上 (0,0)
+            let cy = 0;
+            grid[cx][cy] = "S"; // S = Start
+
+            // ゴール (右下) にたどり着くまで右か下に進む
+            while (cx < width - 1 || cy < height - 1) {
+                // 右に進むか、下に進むかをランダムで決める
+                if (cx < width - 1 && cy < height - 1) {
+                    if (Math.random() < 0.5) cx++; else cy++;
+                } else if (cx < width - 1) {
+                    cx++; // 右端にいくまで右
+                } else {
+                    cy++; // 下端にいくまで下
+                }
+
+                // ゴール地点なら「G」、途中なら「P（Path=道）」とする
+                if (cx === width - 1 && cy === height - 1) {
+                    grid[cx][cy] = "G"; // G = Goal
+                } else {
+                    grid[cx][cy] = "P"; // P = 安全な道
+                }
+            }
+        }
+
+        // 🛠️ 【改造】すでに「道(S, G, P)」がある場所を避けて地雷を置く
         function placeMines() {
             let placed = 0;
             while (placed < mineCount) {
                 const rx = Math.floor(Math.random() * width);
                 const ry = Math.floor(Math.random() * height);
-                if (grid[rx][ry] !== 9) {
+                
+                // 0（まだ何も置かれていない空きマス）の場所にだけ地雷を置く
+                if (grid[rx][ry] === 0) {
                     grid[rx][ry] = 9;
                     placed++;
                 }
             }
         }
 
-        // 3. 周囲の地雷を数える
         function countAdjacentMines() {
             for (let x = 0; x < width; x++) {
                 for (let y = 0; y < height; y++) {
+                    // 自分自身が地雷(9)か、スタート(S)・ゴール(G)・道(P)なら数字計算をスキップ
                     if (grid[x][y] === 9) continue;
-
+                    
                     let count = 0;
                     for (let dx of [-1, 0, 1]) {
                         for (let dy of [-1, 0, 1]) {
@@ -83,14 +113,19 @@
                             }
                         }
                     }
-                    grid[x][y] = count;
+                    
+                    // 空きマス（0）だった場所には、周りの地雷の数をそのまま入れる
+                    if (grid[x][y] === 0) {
+                        grid[x][y] = count;
+                    }
+                    // 道（P）だった場所は、分かりやすいように後で「文字と数字」を組み合わせるため、
+                    // ここでは一旦そのままにしておきます（次のステップで、ゲームとして遊べるようにします）
                 }
             }
         }
 
-        // 4. 黒い画面に文字で出力する
         function printGridTest() {
-            let output = "--- マップデータ ---\n";
+            let output = "--- 迷路マップ ---\n";
             for (let y = 0; y < height; y++) {
                 let line = "";
                 for (let x = 0; x < width; x++) {
@@ -101,8 +136,8 @@
             document.getElementById('log-window').innerHTML = output;
         }
 
-        // 最初に一回実行しておく
         restartGame();
     </script>
 </body>
 </html>
+
