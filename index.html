@@ -187,13 +187,15 @@
                     const cellBtn = document.createElement('div');
                     cellBtn.className = 'cell';
                     cellBtn.innerText = "❓";
-                    cellBtn.onclick = () => handleCellClick(x, y, cellBtn);
+                    // 🛠️ あとでプログラム側から特定のマスを見つけやすくするためIDを付与
+                    cellBtn.id = `cell-${x}-${y}`; 
+                    cellBtn.onclick = () => handleCellClick(x, y);
                     board.appendChild(cellBtn);
                 }
             }
         }
 
-        function handleCellClick(x, y, element) {
+        function handleCellClick(x, y) {
             if (gameOver || revealed[x][y]) return;
 
             if (isFirstClick) {
@@ -201,7 +203,7 @@
                 generateRandomMap(x, y);
             }
 
-            revealCell(x, y, element);
+            revealCell(x, y);
         }
 
         function generateRandomMap(startX, startY) {
@@ -210,25 +212,28 @@
             countAdjacentMines();
         }
 
-        function revealCell(x, y, element) {
+        // 🛠️ 【超重要】マスを開ける処理を関数として独立させ、連鎖できるように改造
+        function revealCell(x, y) {
+            // 範囲外、またはすでに開いているなら何もしない
+            if (x < 0 || x >= width || y < 0 || y >= height || revealed[x][y]) return;
+            
             revealed[x][y] = true;
+            const element = document.getElementById(`cell-${x}-${y}`);
             element.classList.add('open');
             
             const data = grid[x][y];
             
-            // 🛠️ 【改造】Sだった場合も、普通の安全なマスとして数字か空白を表示する
-            if (data.type === "S") {
-                element.innerText = data.count > 0 ? data.count : "";
-                document.getElementById('result-text').innerText = "探索中... ゴール(G)を探せ！";
-            }
-            else if (data.type === "G") {
+            // ゴール地点だった場合
+            if (data.type === "G") {
                 element.innerText = "G";
                 element.className = 'cell open goal';
                 document.getElementById('result-text').innerText = "🎉 迷路クリア！おめでとう！";
                 document.getElementById('result-text').className = "game-clear";
                 gameOver = true;
                 revealAll();
+                return;
             }
+            // 地雷だった場合
             else if (data === 9) {
                 element.innerText = "💥";
                 element.className = 'cell open mine';
@@ -236,31 +241,46 @@
                 document.getElementById('result-text').className = "game-over";
                 gameOver = true;
                 revealAll();
+                return;
             }
-            else {
-                element.innerText = data.count > 0 ? data.count : "";
-                if (data.type === "P") {
-                    element.style.color = "#4f46e5";
+            
+            // スタートや普通の安全マスの表示
+            element.innerText = data.count > 0 ? data.count : "";
+            if (data.type === "P") {
+                element.style.color = "#4f46e5";
+            }
+            
+            document.getElementById('result-text').innerText = "探索中... ゴール(G)を探せ！";
+
+            // ✨【連鎖機能】もし開けたマスの「周りの地雷の数」が0だったら、周囲8マスを自動で開ける
+            if (data.count === 0) {
+                for (let dx of [-1, 0, 1]) {
+                    for (let dy of [-1, 0, 1]) {
+                        // ゴール(G)を勝手に開けてクリアにならないように、G以外のマスを連鎖対象にする
+                        const nx = x + dx;
+                        const ny = y + dy;
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            if (grid[nx][ny].type !== "G") {
+                                revealCell(nx, ny); // 👈 自分自身をもう一度呼び出す（連鎖！）
+                            }
+                        }
+                    }
                 }
             }
         }
 
         function revealAll() {
-            const cells = document.getElementsByClassName('cell');
-            let idx = 0;
             for (let y = 0; y < height; y++) {
                 for (let x = 0; x < width; x++) {
-                    const data = grid[x][y];
-                    const cell = cells[idx];
                     if (!revealed[x][y]) {
+                        const data = grid[x][y];
+                        const cell = document.getElementById(`cell-${x}-${y}`);
                         cell.classList.add('open');
-                        // 答え合わせ時もSは数字として表示
                         if (data.type === "S") { cell.innerText = data.count > 0 ? data.count : ""; }
                         else if (data.type === "G") { cell.innerText = "G"; cell.classList.add('goal'); }
                         else if (data === 9) { cell.innerText = "💣"; cell.classList.add('mine'); }
                         else cell.innerText = data.count > 0 ? data.count : "";
                     }
-                    idx++;
                 }
             }
         }
@@ -269,4 +289,3 @@
     </script>
 </body>
 </html>
-
