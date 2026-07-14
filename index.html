@@ -86,7 +86,7 @@
     
     <div id="result-text"></div>
     
-    <button id="next-stage-btn" class="next-btn" onclick="goToNextStage()">次の階層へ進む ➔</button>
+    <button id="next-stage-btn" class="next-btn" onclick="handleNextStageClick()">次の階層へ進む ➔</button>
     
     <div>
         <button class="reset-btn" onclick="resetToLevel1()">最初からやり直す</button>
@@ -104,10 +104,12 @@
         let clickMode = 'dig', width, height, mineCount, grid, revealed, flagged, gameOver, isFirstClick, startTime;
         
         // 歩行演出用の変数
-        let safetyRoute = []; // スタートからゴールまでの安全パス座標リスト
+        let safetyRoute = []; 
         let currentPlayerIndex = 0;
         let walkIntervalId = null;
-        let isWalking = false;
+        let isWalking = false; 
+        let hasReachedGoal = false; // ゴールをすでに踏んだかどうかのフラグ
+        let isPerfectCleared = false; // パーフェクトを達成したかどうかのフラグ
 
         function setClickMode(mode) {
             clickMode = mode;
@@ -134,6 +136,8 @@
             isFirstClick = true;
             isTimerStopped = false;
             isWalking = false;
+            hasReachedGoal = false;
+            isPerfectCleared = false;
             safetyRoute = [];
             currentPlayerIndex = 0;
             if (walkIntervalId) clearInterval(walkIntervalId);
@@ -174,7 +178,7 @@
         function generateRandomMap(firstX, firstY) {
             let sx = firstX, sy = firstY;
             grid[sx][sy] = "S";
-            safetyRoute = [{x: sx, y: sy}]; // 安全ルートをスタートから記録
+            safetyRoute = [{x: sx, y: sy}]; 
 
             let gx = Math.floor(Math.random() * width), gy = Math.floor(Math.random() * height);
             while (Math.abs(sx - gx) + Math.abs(sy - gy) < Math.floor(width / 2)) {
@@ -187,7 +191,7 @@
                 if(cx < gx) cx++; else if(cx > gx) cx--;
                 else if(cy < gy) cy++; else if(cy > gy) cy--;
                 
-                safetyRoute.push({x: cx, y: cy}); // 経路上を記録していく
+                safetyRoute.push({x: cx, y: cy}); 
                 
                 if (cx === gx && cy === gy) {
                     grid[cx][cy] = "G";
@@ -228,7 +232,6 @@
                 }
             }
 
-            // スタート位置にキャラクターをビジュアル表示
             document.getElementById(`cell-${sx}-${sy}`).classList.add('player-on');
         }
 
@@ -328,7 +331,12 @@
             if (data.type === 'G') { 
                 cell.innerText = "G"; 
                 cell.className += " goal"; 
-                startCharacterWalk(false); // ゴール到達で歩行スタート！
+                hasReachedGoal = true;
+                
+                // 歩行演出は開始せず、クリアボタンの出現と状況アナウンスのみ
+                document.getElementById('result-text').innerText = `🚩 ゴール発見！(次の階層へ進めます)\nさらに安全に全消しできればタイマーが止まり、ボーナス2倍！`;
+                document.getElementById('result-text').className = "game-clear";
+                document.getElementById('next-stage-btn').style.display = "block";
             } else {
                 if (data.count > 0) { 
                     cell.innerText = data.count; 
@@ -342,17 +350,31 @@
             checkPerfectClear();
         }
 
+        // 次の階層へ進むボタンが押された時の処理
+        function handleNextStageClick() {
+            if (isWalking) return; // 歩行中は何もしない
+            
+            if (isPerfectCleared) {
+                // パーフェクト時はすでに歩き終えているので、すぐに次の階層へ
+                goToNextStage();
+            } else {
+                // 通常ゴール時は、次の階層へ行くボタンが押されたタイミングでトコトコ歩かせる
+                startCharacterWalk(false);
+            }
+        }
+
         // キャラクターをゴールまでトコトコ動かす
         function startCharacterWalk(isPerfect) {
-            if (isWalking) return;
             isWalking = true;
-            isTimerStopped = true; // 歩行中はタイマーを一時停止
+            isTimerStopped = true; 
             clearInterval(timerId);
+
+            // 「次の階層に進む」ボタンを一時的に非表示（または無効化）にして、連打を防ぐ
+            document.getElementById('next-stage-btn').style.display = "none";
 
             currentPlayerIndex = 0;
 
             walkIntervalId = setInterval(() => {
-                // 古い位置からキャラを消す
                 const prevPos = safetyRoute[currentPlayerIndex];
                 const prevCell = document.getElementById(`cell-${prevPos.x}-${prevPos.y}`);
                 prevCell.classList.remove('player-on');
@@ -360,15 +382,12 @@
                 currentPlayerIndex++;
 
                 if (currentPlayerIndex < safetyRoute.length) {
-                    // 新しい位置へキャラを移動
                     const currPos = safetyRoute[currentPlayerIndex];
                     const currCell = document.getElementById(`cell-${currPos.x}-${currPos.y}`);
                     currCell.classList.add('player-on');
 
-                    // キャラが通った道を自動で安全にオープンする（踏破感）
                     revealWalkingCell(currPos.x, currPos.y);
                 } else {
-                    // ゴール到着時
                     clearInterval(walkIntervalId);
                     const finalPos = safetyRoute[safetyRoute.length - 1];
                     const finalCell = document.getElementById(`cell-${finalPos.x}-${finalPos.y}`);
@@ -376,12 +395,12 @@
                     finalCell.classList.add('player-goal');
                     finalCell.classList.add('goal-success');
 
+                    // 🚶がゴールに着いた瞬間に、スコア計算と次のステージへの遷移を行う
                     triggerLevelClear(isPerfect);
                 }
-            }, 250); // 0.25秒ごとに1マス進む（トコトコ感）
+            }, 200); 
         }
 
-        // 🚶が歩いたマスを安全に開ける
         function revealWalkingCell(x, y) {
             if (revealed[x][y]) return;
             revealed[x][y] = true;
@@ -389,7 +408,7 @@
             cell.classList.add('open');
             const data = grid[x][y];
 
-            totalScore += 5; // 歩きながらスコアも加算
+            totalScore += 5; 
             document.getElementById('score-display').innerText = `Score: ${totalScore}`;
 
             if (data.type === 'G') {
@@ -405,22 +424,32 @@
 
         function triggerLevelClear(isPerfect) {
             if (isPerfect) {
+                // パーフェクトの報酬計算
                 const timeBonus = Math.floor(timeLeft * 20); 
                 totalScore += 300 + timeBonus; 
                 document.getElementById('score-display').innerText = `Score: ${totalScore}`;
                 
                 document.getElementById('result-text').innerText = `✨ 盤面全開！パーフェクト！\n探索ボーナス(+300) + 残タイム2倍ボーナス(+${timeBonus})`;
                 document.getElementById('result-text').className = "game-clear";
+                
+                // 🚶が到着して感動を味わってもらうため、ボタンを再表示
+                document.getElementById('next-stage-btn').innerText = "次の階層へ進む ➔";
+                document.getElementById('next-stage-btn').style.display = "block";
             } else {
-                document.getElementById('result-text').innerText = `🚩 ゴール達成！\nさらに安全に全消しできればタイマーが止まり、ボーナス2倍！`;
-                document.getElementById('result-text').className = "game-clear";
+                // 通常ゴールの報酬計算（ここで逃げ切りボーナスを精算する）
+                const timeBonus = Math.floor(timeLeft * 10); 
+                totalScore += 100 + timeBonus; 
+                document.getElementById('score-display').innerText = `Score: ${totalScore}`;
+
+                // 🚶が到着したら、そのまま間を置かずに次の階層へ自動で進ませます（テンポ重視）
+                setTimeout(() => {
+                    goToNextStage();
+                }, 800);
             }
-            
-            document.getElementById('next-stage-btn').style.display = "block";
         }
 
         function checkPerfectClear() {
-            if (gameOver || isWalking) return; // 既にクリア歩行中の場合はチェックしない
+            if (gameOver || isWalking || isPerfectCleared) return; 
 
             let openedSafeCells = 0;
             let totalSafeCells = 0;
@@ -435,21 +464,12 @@
             }
 
             if (openedSafeCells === totalSafeCells) {
-                startCharacterWalk(true); // パーフェクト判定の歩行へ！
+                isPerfectCleared = true;
+                startCharacterWalk(true); // パーフェクト時は即座に歓喜の歩行演出へ！
             }
         }
 
         function goToNextStage() {
-            // ゴールで逃げた場合のスコアボーナス精算
-            if (isWalking && document.getElementById(`cell-${safetyRoute[safetyRoute.length-1].x}-${safetyRoute[safetyRoute.length-1].y}`).classList.contains('player-goal')) {
-                // すでにゴールしている（かつパーフェクトではない）場合にのみ、逃げ切りボーナスを確定
-                const isPerfect = document.getElementById('result-text').innerText.includes('パーフェクト');
-                if (!isPerfect) {
-                    const timeBonus = Math.floor(timeLeft * 10); 
-                    totalScore += 100 + timeBonus; 
-                }
-            }
-            
             currentLevel++;
             const maxLevel = localStorage.getItem('mines_maze_max_level') || 1;
             if (currentLevel > parseInt(maxLevel)) {
