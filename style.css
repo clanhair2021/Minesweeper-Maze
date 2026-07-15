@@ -1,0 +1,275 @@
+body {
+    font-family: sans-serif;
+    text-align: center;
+    background: #eef2f3;
+    padding: 10px;
+    margin: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+h1 {
+    font-size: 1.3rem;
+    color: #333;
+    margin: 5px 0;
+}
+
+/* ステータス周り */
+.game-status-header {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+.level-badge {
+    background: #4f46e5;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+.score-badge {
+    background: #10b981;
+    color: white;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+
+.action-select {
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+.action-btn {
+    padding: 10px 20px;
+    font-size: 1rem;
+    border: 2px solid #cbd5e1;
+    background: white;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #475569;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.action-btn.active {
+    background: #f59e0b;
+    color: white;
+    border-color: #d97706;
+}
+
+/* タイムゲージと情報 */
+.stats-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: white;
+    max-width: 320px;
+    margin: 0 auto 10px auto;
+    padding: 10px;
+    border-radius: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.stats-row {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #475569;
+}
+
+/* 視覚的なタイムバー */
+.time-bar-container {
+    width: 90%;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+.time-bar-fill {
+    height: 100%;
+    width: 100%;
+    background: #ef4444;
+    transition: width 0.1s linear;
+}
+
+.best-score {
+    font-size: 0.8rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.board-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    margin-bottom: 15px;
+    -webkit-overflow-scrolling: touch;
+}
+#game-board {
+    display: grid;
+    gap: 2px;
+    margin: 0 auto;
+    background: #bbb;
+    padding: 4px;
+    border-radius: 8px;
+    touch-action: manipulation;
+}
+
+.cell {
+    aspect-ratio: 1;
+    background: #cbd5e1;
+    border: none;
+    border-radius: 3px;
+    font-size: 1rem;
+    font-weight: bold;
+    box-shadow: inset 0 -2px 0 #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+}
+.cell.open {
+    background: #f1f5f9;
+    box-shadow: none;
+}
+.cell.mine {
+    background: #ef4444;
+    color: white;
+}
+.cell.goal {
+    background: #10b981;
+    color: white;
+}
+.cell.goal-success {
+    background: #fbbf24 !important;
+    color: #333 !important;
+    animation: celebration 0.5s infinite alternate;
+}
+
+/* キャラクター表示スタイル */
+.cell.player-on::after {
+    content: "🚶";
+    font-size: 1.2rem;
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    animation: bounce 0.25s infinite alternate;
+}
+.cell.player-goal::after {
+    content: "🙌";
+    font-size: 1.3rem;
+    position: absolute;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    animation: bounce 0.15s infinite alternate;
+}
+
+@keyframes bounce {
+    from { transform: translateY(0); }
+    to { transform: translateY(-3px); }
+}
+@keyframes celebration {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+}
+
+.c-1 { color: #2563eb; } .c-2 { color: #16a34a; } .c-3 { color: #dc2626; } .c-4 { color: #7c3aed; }
+
+#result-text {
+    font-size: 1.1rem;
+    font-weight: bold;
+    margin: 10px 0;
+    min-height: 28px;
+    line-height: 1.4;
+}
+.game-over { color: #ef4444; }
+.game-clear { color: #10b981; }
+
+.next-btn {
+    display: none;
+    padding: 12px 24px;
+    font-size: 1.1rem;
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    margin: 0 auto 10px auto;
+}
+.reset-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    background: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* 確認ポップアップ用スタイル */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+}
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    width: 280px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.modal-title {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    color: #1e293b;
+}
+.modal-body {
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    color: #64748b;
+    line-height: 1.4;
+}
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+.modal-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 6px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+}
+.modal-btn-cancel {
+    background: #e2e8f0;
+    color: #475569;
+}
+.modal-btn-confirm {
+    background: #10b981;
+    color: white;
+}
