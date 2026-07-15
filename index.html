@@ -56,6 +56,16 @@
         
         .next-btn { display: none; padding: 12px 24px; font-size: 1.1rem; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 0 auto 10px auto; }
         .reset-btn { padding: 6px 12px; font-size: 0.85rem; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer; }
+
+        /* 確認ポップアップ用スタイル */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 12px; width: 280px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+        .modal-title { font-weight: bold; font-size: 1.1rem; margin-bottom: 10px; color: #1e293b; }
+        .modal-body { font-size: 0.9rem; margin-bottom: 20px; color: #64748b; line-height: 1.4; }
+        .modal-buttons { display: flex; gap: 10px; justify-content: center; }
+        .modal-btn { flex: 1; padding: 10px; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; }
+        .modal-btn-cancel { background: #e2e8f0; color: #475569; }
+        .modal-btn-confirm { background: #10b981; color: white; }
     </style>
 </head>
 <body>
@@ -86,10 +96,25 @@
     
     <div id="result-text"></div>
     
-    <button id="next-stage-btn" class="next-btn" onclick="handleNextStageClick()">次の階層へ進む ➔</button>
+    <button id="next-stage-btn" class="next-btn" onclick="showConfirmDialog()">次の階層へ進む ➔</button>
     
     <div>
         <button class="reset-btn" onclick="resetToLevel1()">最初からやり直す</button>
+    </div>
+
+    <!-- 移動確認用カスタムモーダル（ポップアップ） -->
+    <div id="confirm-modal" class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-title">次の階層へ進みますか？</div>
+            <div class="modal-body">
+                まだ盤面に安全なマスが残っています！<br>
+                全消し（パーフェクト）を狙う場合は、キャンセルして探索を続けられます。
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeConfirmDialog()">探索を続ける</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmMoveStage()">移動する</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -103,13 +128,12 @@
 
         let clickMode = 'dig', width, height, mineCount, grid, revealed, flagged, gameOver, isFirstClick, startTime;
         
-        // 歩行演出用の変数
         let safetyRoute = []; 
         let currentPlayerIndex = 0;
         let walkIntervalId = null;
         let isWalking = false; 
-        let hasReachedGoal = false; // ゴールをすでに踏んだかどうかのフラグ
-        let isPerfectCleared = false; // パーフェクトを達成したかどうかのフラグ
+        let hasReachedGoal = false; 
+        let isPerfectCleared = false; 
 
         function setClickMode(mode) {
             clickMode = mode;
@@ -333,10 +357,12 @@
                 cell.className += " goal"; 
                 hasReachedGoal = true;
                 
-                // 歩行演出は開始せず、クリアボタンの出現と状況アナウンスのみ
                 document.getElementById('result-text').innerText = `🚩 ゴール発見！(次の階層へ進めます)\nさらに安全に全消しできればタイマーが止まり、ボーナス2倍！`;
                 document.getElementById('result-text').className = "game-clear";
                 document.getElementById('next-stage-btn').style.display = "block";
+                
+                // 初めてゴールを開けたときに、移動するかどうかの確認ダイアログを自動ポップアップ
+                showConfirmDialog();
             } else {
                 if (data.count > 0) { 
                     cell.innerText = data.count; 
@@ -350,17 +376,29 @@
             checkPerfectClear();
         }
 
-        // 次の階層へ進むボタンが押された時の処理
-        function handleNextStageClick() {
-            if (isWalking) return; // 歩行中は何もしない
+        // 移動確認ダイアログの表示
+        function showConfirmDialog() {
+            if (isWalking) return;
             
+            // すでにパーフェクト達成している場合はダイアログなしでそのまま次のステージへ
             if (isPerfectCleared) {
-                // パーフェクト時はすでに歩き終えているので、すぐに次の階層へ
                 goToNextStage();
-            } else {
-                // 通常ゴール時は、次の階層へ行くボタンが押されたタイミングでトコトコ歩かせる
-                startCharacterWalk(false);
+                return;
             }
+
+            // ダイアログ（モーダル）を表示
+            document.getElementById('confirm-modal').style.display = 'flex';
+        }
+
+        // 移動確認ダイアログを閉じる（探索を続ける）
+        function closeConfirmDialog() {
+            document.getElementById('confirm-modal').style.display = 'none';
+        }
+
+        // 移動を確定させた時の処理
+        function confirmMoveStage() {
+            closeConfirmDialog();
+            startCharacterWalk(false); // 通常クリアの歩行演出を開始！
         }
 
         // キャラクターをゴールまでトコトコ動かす
@@ -369,7 +407,6 @@
             isTimerStopped = true; 
             clearInterval(timerId);
 
-            // 「次の階層に進む」ボタンを一時的に非表示（または無効化）にして、連打を防ぐ
             document.getElementById('next-stage-btn').style.display = "none";
 
             currentPlayerIndex = 0;
@@ -395,7 +432,6 @@
                     finalCell.classList.add('player-goal');
                     finalCell.classList.add('goal-success');
 
-                    // 🚶がゴールに着いた瞬間に、スコア計算と次のステージへの遷移を行う
                     triggerLevelClear(isPerfect);
                 }
             }, 200); 
@@ -424,7 +460,6 @@
 
         function triggerLevelClear(isPerfect) {
             if (isPerfect) {
-                // パーフェクトの報酬計算
                 const timeBonus = Math.floor(timeLeft * 20); 
                 totalScore += 300 + timeBonus; 
                 document.getElementById('score-display').innerText = `Score: ${totalScore}`;
@@ -432,19 +467,18 @@
                 document.getElementById('result-text').innerText = `✨ 盤面全開！パーフェクト！\n探索ボーナス(+300) + 残タイム2倍ボーナス(+${timeBonus})`;
                 document.getElementById('result-text').className = "game-clear";
                 
-                // 🚶が到着して感動を味わってもらうため、ボタンを再表示
-                document.getElementById('next-stage-btn').innerText = "次の階層へ進む ➔";
-                document.getElementById('next-stage-btn').style.display = "block";
+                // ゴール到着のポーズをしっかり見せたあと、1.2秒後に自動で次のステージへ移動！
+                setTimeout(() => {
+                    goToNextStage();
+                }, 1200);
             } else {
-                // 通常ゴールの報酬計算（ここで逃げ切りボーナスを精算する）
                 const timeBonus = Math.floor(timeLeft * 10); 
                 totalScore += 100 + timeBonus; 
                 document.getElementById('score-display').innerText = `Score: ${totalScore}`;
 
-                // 🚶が到着したら、そのまま間を置かずに次の階層へ自動で進ませます（テンポ重視）
                 setTimeout(() => {
                     goToNextStage();
-                }, 800);
+                }, 1000);
             }
         }
 
@@ -465,7 +499,7 @@
 
             if (openedSafeCells === totalSafeCells) {
                 isPerfectCleared = true;
-                startCharacterWalk(true); // パーフェクト時は即座に歓喜の歩行演出へ！
+                startCharacterWalk(true); // パーフェクト時は自動で歩行スタート！
             }
         }
 
